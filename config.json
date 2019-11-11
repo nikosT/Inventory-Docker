@@ -1,0 +1,4 @@
+{
+  "FDSN_STATION_URL": "http://eida.gein.noa.gr/fdsnws/station/1/query",
+  "FDSN_DATASELECT_URL": "http://eida.gein.noa.gr/fdsnws/dataselect/1/query"
+}
