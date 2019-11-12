@@ -139,8 +139,8 @@ def show_waveform(query_array):
     if isinstance(query_array, HTTPResponse):
       return query_array
 
-    request.query.start="2019-01-01"
-    request.query.end="2019-01-02"
+    #request.query.start="2019-01-01"
+    #request.query.end="2019-01-02"
 
     # Limit requested data to a timespan of one day
     if (UTCDateTime(request.query.end).timestamp - UTCDateTime(request.query.start).timestamp) > 86400:
