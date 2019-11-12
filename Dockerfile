@@ -43,6 +43,8 @@ RUN pip2 install -U obspy
 
 RUN pip2 install -U bottle
 
+EXPOSE 8080
+
 COPY ./inventory.py ./inventory.py
 COPY ./config.json ./config.json
 
