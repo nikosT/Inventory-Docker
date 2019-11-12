@@ -8,7 +8,7 @@ help: ## This help
 
 start: ## Build the container
 	sudo docker build -t $(APP_NAME):1 .;
-	sudo docker run -dit --restart unless-stopped --name="$(APP_NAME)" -p 8080:8080 $(APP_NAME):1
+	sudo docker run -d --restart unless-stopped --name="$(APP_NAME)" $(APP_NAME):1
 
 stop: ## Stop and remove the container
 	sudo docker stop $(APP_NAME); sudo docker rm $(APP_NAME);
