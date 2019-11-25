@@ -48,7 +48,7 @@ def server_static(filename):
 @route("/")
 def send_nothing():
 
-    return HTTPResponse(status=204)
+    return HTTPResponse(headers=CONTENT_HEADERS, status=204)
 
 
 """
@@ -58,7 +58,7 @@ Response routes
 @route("/response/<network>")
 def send_nothing(network):
 
-    return HTTPResponse(status=204)
+    return HTTPResponse(headers=CONTENT_HEADERS, status=204)
 
 @route("/response/<network>/<station>")
 def display_station(network, station):
@@ -83,18 +83,18 @@ Waveform routes
 @route("/waveform/<network>")
 def send_nothing(network):
 
-    return HTTPResponse(status=400)
+    return HTTPResponse(headers=CONTENT_HEADERS, status=400)
 
 @route("/waveform/<network>/<station>")
 def display_station(network, station):
 
-    return HTTPResponse(status=400)
+    return HTTPResponse(headers=CONTENT_HEADERS, status=400)
 
 
 @route("/waveform/<network>/<station>/<location>")
 def send_nothing(network, station, location):
 
-  return HTTPResponse(status=400)
+  return HTTPResponse(headers=CONTENT_HEADERS, status=400)
 
 # Define routes to up to a station level
 @route("/waveform/<network>/<station>/<location>/<channel>")
@@ -110,10 +110,10 @@ def create_query_array(which, network, station, location, channel):
   """
 
   if not network.isalnum():
-    return HTTPResponse("Network code must be alphanumerical", status=400)
+    return HTTPResponse("Network code must be alphanumerical", headers=CONTENT_HEADERS, status=400)
 
   if not station.isalnum():
-    return HTTPResponse("Station code must be alphanumerical", status=400)
+    return HTTPResponse("Station code must be alphanumerical", headers=CONTENT_HEADERS, status=400)
 
   query_array = []
 
@@ -139,30 +139,36 @@ def show_waveform(query_array):
     if isinstance(query_array, HTTPResponse):
       return query_array
 
-    #request.query.start="2019-01-01"
-    #request.query.end="2019-01-02"
+#    request.query.start="2019-01-01";
+#    request.query.end="2019-01-02";
 
     # Limit requested data to a timespan of one day
-    if (UTCDateTime(request.query.end).timestamp - UTCDateTime(request.query.start).timestamp) > 86400:
-      return HTTPResponse(status=413)
+    if (UTCDateTime(request.query.end).timestamp - UTCDateTime(request.query.start).timestamp) > 1800:
+      return HTTPResponse(headers=CONTENT_HEADERS, status=413)
+
+    # Limit requested data to a timespan of one hour if deconvolve is selected
+    #if (UTCDateTime(request.query.end).timestamp - UTCDateTime(request.query.start).timestamp) > 1800 and request.query.units != "rawdata":
+      #return HTTPResponse(headers=CONTENT_HEADERS, status=413)
 
     # Go over all supported keys
     for key in ["start", "end"]:
 
         value = getattr(request.query, key)
         if value == "" :
-            return HTTPResponse("%s is required" % key, status=400)
+            return HTTPResponse("%s is required" % key, headers=CONTENT_HEADERS, status=400)
 
         query_array.append(key + "=" + value)
     
+    #print "before try"
     # Try getting the stream
     # If the request fails send a 204 NO CONTENT reply
     try:
       stream = read(CONFIG["FDSN_DATASELECT_URL"] + "?" + "&".join(query_array))
       
+      #print "got stream"
       # apply instrument deconvolution
       deconvolution(stream, query_array)
-
+      
       trace_counter = 0
 
       waveform_trace  = {
@@ -190,8 +196,8 @@ def show_waveform(query_array):
           waveform.append(value)
 
         # downsample to 1 sample per second
-        waveform = waveform[1::int(trace.stats.sampling_rate)]
-        time_array = time_array[1::int(trace.stats.sampling_rate)]
+        #waveform = waveform[1::int(trace.stats.sampling_rate)]
+        #time_array = time_array[1::int(trace.stats.sampling_rate)]
 
         for t,value in zip(time_array, waveform):
           waveform_trace_data = [t,value]
@@ -200,8 +206,7 @@ def show_waveform(query_array):
           null = [t, None]
           waveform_trace["data"].append(null)
     except Exception as e:
-      print e
-      return HTTPResponse(status=204)
+      return HTTPResponse(headers=CONTENT_HEADERS, status=204)
 
     # Filter stream
     minfr = request.query.freqmin
@@ -214,7 +219,7 @@ def show_waveform(query_array):
         if maxfr != "":
             stream = stream.filter("lowpass", freq=float(maxfr))
     except Exception as e:
-        return HTTPResponse(str(e), status=400)
+        return HTTPResponse(str(e), headers=CONTENT_HEADERS, status=400)
 
     if request.query.units == "rawdata":
       abbrev=""
@@ -233,12 +238,14 @@ def show_waveform(query_array):
     )
 
 def deconvolution(stream, query_array):
+
     # Read inventory used for deconvolution
     if request.query.units != "rawdata":
         try:
+            #print "getting resp"
             inv = read_inventory(CONFIG["FDSN_STATION_URL"] + "?" + "&".join(query_array)+ "&level=response")
         except Exception:
-            return HTTPResponse(status=204)
+            return HTTPResponse(headers=CONTENT_HEADERS, status=204)
         
         if request.query.units == "displacement":
             outp="DISP"
@@ -247,13 +254,20 @@ def deconvolution(stream, query_array):
         else:
             outp="VEL"
 
+        #print "got resp"
+        import time
         # Instrument response deconvolution
         for trace in stream:
+            #print trace
+            #start = time.time()
             trace.remove_response(
               inventory=inv, 
               output=outp
             )
+            #end = time.time()
+            #print(end - start)
 
+        #print "response removed"
 def show_inventory(query_array):
 
     """
@@ -328,6 +342,8 @@ def show_inventory(query_array):
           "data": [],
           "typo": "amplitude",
           "nyquist": nyquist,
+          "start": str(cha.start_date) or "",
+          "end": str(cha.end_date) or "",
         }
         for x,y in zip(freq_new, amplitude):
           if x > nyquist:
@@ -344,6 +360,8 @@ def show_inventory(query_array):
           "data": [],
           "typo": "phase",
           "nyquist": nyquist,
+          "start": str(cha.start_date) or "",
+          "end": str(cha.end_date) or "",
         }
         for x,y in zip(freq_new, phase):
           if x > nyquist:
@@ -353,8 +371,8 @@ def show_inventory(query_array):
         response_data.append(channel_phase)
 
     except Exception as e:
-      print e
-      return HTTPResponse(status=204)
+      #print e
+      return HTTPResponse(headers=CONTENT_HEADERS, status=204)
 
     return HTTPResponse(
       {"payload": response_data},
@@ -363,4 +381,4 @@ def show_inventory(query_array):
     )
 
 # Run default Bottle application used with WSGI
-run(host=sys.argv[1], port=8080, debug=True)
+run(host=sys.argv[1], port=8080, debug=True, server='eventlet')
