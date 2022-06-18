@@ -3,4 +3,4 @@ eventlet==0.25.1
 matplotlib==2.0.2
 numpy==1.21.0
 obspy==1.0.3
-bottle==0.12.19
+bottle==0.12.20
